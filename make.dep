@@ -1,0 +1,17 @@
+-nostdinc
+-M
+vm86call.c
+graphics.c
+main.c
+lib/sysconf.c
+lib/math.c
+lib/stdio.c
+lib/stdlib.c
+lib/qsort.c
+../lib/softfloat.c
+../lib/string.c
+../lib/memcpy.c
+../lib/memset.c
+../lib/snprintf.c
+lib/malloc.c
+../lib/tlsf/tlsf.c
