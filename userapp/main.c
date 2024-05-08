@@ -47,7 +47,7 @@ void bubsort2(int* a, int n);
 void tsk_foo1(void* pv);
 void tsk_foo2(void* pv);
 void key_control(void* pv);
-void render_array(COLORREF color, int* a, int n, window_info window);
+void render_array(COLORREF color, int* a, int n, window_info* window);
 void render_bar(COLORREF color, int percent, short left_gravity, window_info window);
 void mySleep();
 #define MATSIZE 4
@@ -203,14 +203,14 @@ void key_control(void* pv) {
 	}
 }
 
-void render_array(COLORREF color, int* arr, int size, window_info windowInfo) {
+void render_array(COLORREF color, int* arr, int size, window_info* windowInfo) {
 	int  X_pos, X_size, Y_pos;
-	X_pos = windowInfo.x;
-	X_size = windowInfo.width;
-	Y_pos = windowInfo.y;
+	X_pos = windowInfo->x;
+	X_size = windowInfo->width;
+	Y_pos = windowInfo->y;
 
     // int y_reso = g_graphic_dev.YResolution;
-	int y_reso = windowInfo.height;
+	int y_reso = windowInfo->height;
     int j = 0;
     int max = 0;
     int min = 100;
@@ -272,15 +272,15 @@ static int mutex[buffer_size];
 static int full;
 static int empty;
 static int arr[buffer_size][task4_ARRSIZE];
-#define sleeptime 2
+#define sleeptime 0.1
+static window_info* window_p;
+static window_info* window_c;
+// #define render_on
 
 void consumer_bub(int* a, int n, int k)
 {
-	window_info window;
-	window.width = (int)(g_graphic_dev.XResolution / buffer_size);
-	window.height = (int)(g_graphic_dev.YResolution * 0.9);
-	window.y = 0;
-	window.x = (int)(g_graphic_dev.XResolution / buffer_size) * k;
+
+	window_c->x = (int)(g_graphic_dev.XResolution / buffer_size) * k;
 	int i, j, temp;
 	for (i = 0; i < n; i++)
 	{
@@ -291,7 +291,10 @@ void consumer_bub(int* a, int n, int k)
 				temp = a[j];
 				a[j] = a[j + 1];
 				a[j + 1] = temp;
-				// render_array(color_r, a, n, window);	
+#ifdef render_on
+				
+				render_array(color_r, a, n, window);	//this bring bugs
+#endif
 			}
 		}
 	}
@@ -304,10 +307,7 @@ void consumer_thread(void* pv) {
 	while(1) {
 		sem_wait(full);
 		sem_wait(mutex[k]);
-		for ( i = 0; i < buffer_size; i++)
-		{
-			consumer_bub(arr[k], task4_ARRSIZE, k);
-		}
+		consumer_bub(arr[k], task4_ARRSIZE, k);
 		sem_signal(mutex[k]);
 		sem_signal(empty);
 		fsleep(sleeptime);
@@ -315,29 +315,29 @@ void consumer_thread(void* pv) {
 		++k;
 		if (k == buffer_size) k = 0;
 	}
-
 }
 
 void producer_thread(void* pv) {
 	int k = 0;
 	int i = 0;
 	printf("ENTER PRODUCER\n\r");
-	window_info window;
-	window.width = (int)(g_graphic_dev.XResolution / buffer_size) - 1;
-	window.height = (int)(g_graphic_dev.YResolution * 0.9);
-	window.y = 0;
-	window.x = (int)(g_graphic_dev.XResolution / buffer_size) * k;
+	window_info* window_p = (window_info*) malloc(sizeof(window_info));
+
 	srand(time(NULL));
 	while(1) {
 		sem_wait(empty);
 		printf("producer get empty\n\r");
 		sem_wait(mutex[k]);
 		printf("producer get mutex\n\r");
+		window_p->x = k * window_p->width;
 		for (i = 0; i < task4_ARRSIZE; i++)
 		{
 			arr[k][i] = rand() % (4 * task4_ARRSIZE);
-			// render_array(color_l, arr[k], task4_ARRSIZE, window);
+#ifdef render_on
+			render_array(color_l, arr[k], task4_ARRSIZE, window_p);
+#endif
 		}
+
 		printf("Producer Check\n\t");
 		sem_signal(mutex[k]);
 		sem_signal(full);
@@ -345,15 +345,28 @@ void producer_thread(void* pv) {
 		++k;
 		if (k == buffer_size) k = 0;
 	}
+	free(window_p);
+	return;
 }
 
 
 void main(void *pv)
 {
-    
+    window_p->width = (int)(g_graphic_dev.XResolution / buffer_size) - 1;
+	window_p->height = (int)(g_graphic_dev.YResolution * 0.9);
+	window_p->y = 0;
+	window_p->x = 0;
+
+	window_c = (window_info*)malloc(sizeof(window_info));
+	window_c->width = (int)(g_graphic_dev.XResolution / buffer_size);
+	window_c->height = (int)(g_graphic_dev.YResolution * 0.9);
+	window_c->y = 0;
+
     printf("task #%d: I'm the first user task(pv=0x%08x)!\r\n",
             task_getid(), pv);
-	// init_graphic(0x115);
+#ifdef render_on
+	init_graphic(0x115);
+#endif
 	int i = 0;
 	for (i = 0; i < buffer_size; i++)
 	{
@@ -378,28 +391,30 @@ void main(void *pv)
 		printf("-*STACK INIT FINISHED*-\r\n");
 		printf("-*STACK consumer %x*-\r\n", stack_consumer);
 		printf("-*STACK producer %x*-\r\n", stack_producer);
-		// printf("-*STACK control %x*-\r\n", stack_control);
+		printf("-*STACK control %x*-\r\n", stack_control);
 
 
 		tid_producer = task_create(stack_producer + stack_size, &producer_thread, NULL);
 		tid_consumer = task_create(stack_consumer + stack_size, &consumer_thread, NULL);
 
 		printf("-*PRODUCER CREATED ID = %d*-\r\n", tid_producer);
-		printf("-*CONSUMER CREATED ID = %d*-\r\n", tid_consumer);
+		// printf("-*CONSUMER CREATED ID = %d*-\r\n", tid_consumer);
 
 		control_pv.tid_foo1 = tid_consumer;
 		control_pv.tid_foo2 = tid_producer;
 		// tid_control = task_create(stack_control + stack_size, &key_control, cpv);
 		// printf("-*KEY_CTRL CREATED ID = %d*-\r\n", tid_control);
 
-		setpriority(tid_producer, 10);
-		setpriority(tid_consumer, 10);
+		setpriority(tid_producer, 1);
+		setpriority(tid_consumer, 0);
 		// setpriority(tid_control, 0);
 		//why I'm doing this? fuck you
 		fsleep(120.0);
 		// free(stack_consumer);
 		// free(stack_producer);
 		// free(stack_control);
+		free(window_c);
+		free(window_p);
     };
     task_exit(0);
 }
