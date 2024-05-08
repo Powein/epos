@@ -54,10 +54,12 @@ void mySleep();
 typedef float matrix[MATSIZE * MATSIZE];
 typedef float vector[MATSIZE];
 //睡眠函数
-void mySleep() {
+void fsleep(float sec) {
 	struct timespec tim, tim2;
-	tim.tv_sec = 0;
-	tim.tv_nsec = 0;
+	int isec = (int)sec;
+	int nsec = (int)(1000000000 * (sec - isec));
+	tim.tv_sec = isec;
+	tim.tv_nsec = nsec;
 	nanosleep(&tim, &tim2);
 }
 
@@ -152,8 +154,16 @@ void key_control(void* pv) {
 	int tid_foo2 = px->tid_foo2;
 	int percent_l = (int)(getpriority(tid_foo1) * 100 / 127);
 	int percent_r = (int)(getpriority(tid_foo2) * 100 / 127);
-	window_info window_l = { 720, 50, 0, 850 };
-	window_info window_r = { 720, 50, 720, 850};
+	window_info window_l;
+	window_info window_r;
+	//The bar may be a little fat..
+	window_r.width = (int)(g_graphic_dev.XResolution / 2);
+	window_l.height = (int)(g_graphic_dev.YResolution * 0.18);//coopreate with another part, may see consumer and producer thread
+	window_r.x = (int)(g_graphic_dev.XResolution * 0.5);
+	window_l.x = 0;
+	window_r.y = (int)(g_graphic_dev.YResolution * 0.80);
+	window_l.y = (int)(g_graphic_dev.YResolution * 0.80);
+
 	render_bar(color_r, percent_l, RIGHT_GRAV, window_l);
 	render_bar(color_l, percent_r, LEFT_GRAV, window_r);
 
@@ -236,7 +246,7 @@ void render_array(COLORREF color, int* arr, int size, window_info windowInfo) {
 }
 
 void render_bar(COLORREF color, int percent, short left_gravity, window_info windowInfo) {
-	float percent_ = (float)percent / 45; 
+	float percent_ = (float)percent / 45; //magic number, do not change unless piority system is changed
 	color = color + 4*percent;
 	if (left_gravity == 1){
 		size_t y = windowInfo.y;
@@ -262,11 +272,12 @@ static int mutex[buffer_size];
 static int full;
 static int empty;
 static int arr[buffer_size][task4_ARRSIZE];
+#define sleeptime 2
 
 void consumer_bub(int* a, int n, int k)
 {
 	window_info window;
-	window.width = (int)(g_graphic_dev.XResolution / buffer_size) - 1;
+	window.width = (int)(g_graphic_dev.XResolution / buffer_size);
 	window.height = (int)(g_graphic_dev.YResolution * 0.9);
 	window.y = 0;
 	window.x = (int)(g_graphic_dev.XResolution / buffer_size) * k;
@@ -280,16 +291,16 @@ void consumer_bub(int* a, int n, int k)
 				temp = a[j];
 				a[j] = a[j + 1];
 				a[j + 1] = temp;
-				render_array(color_r, a, n, window);
+				// render_array(color_r, a, n, window);	
 			}
 		}
-		mySleep();
 	}
 }
 
-void consumer_thread() {
+void consumer_thread(void* pv) {
 	int k = 0;
 	int i = 0;
+	printf("ENTER CONSUMER\n\r");
 	while(1) {
 		sem_wait(full);
 		sem_wait(mutex[k]);
@@ -299,15 +310,18 @@ void consumer_thread() {
 		}
 		sem_signal(mutex[k]);
 		sem_signal(empty);
+		fsleep(sleeptime);
+		printf("Consumer Check\n\r");
 		++k;
 		if (k == buffer_size) k = 0;
 	}
 
 }
 
-void producer_thread() {
+void producer_thread(void* pv) {
 	int k = 0;
 	int i = 0;
+	printf("ENTER PRODUCER\n\r");
 	window_info window;
 	window.width = (int)(g_graphic_dev.XResolution / buffer_size) - 1;
 	window.height = (int)(g_graphic_dev.YResolution * 0.9);
@@ -316,14 +330,18 @@ void producer_thread() {
 	srand(time(NULL));
 	while(1) {
 		sem_wait(empty);
+		printf("producer get empty\n\r");
 		sem_wait(mutex[k]);
+		printf("producer get mutex\n\r");
 		for (i = 0; i < task4_ARRSIZE; i++)
 		{
-			arr[k][i] = rand() % 4 * task4_ARRSIZE;
-			render_array(color_l, arr[k], task4_ARRSIZE, window);
+			arr[k][i] = rand() % (4 * task4_ARRSIZE);
+			// render_array(color_l, arr[k], task4_ARRSIZE, window);
 		}
+		printf("Producer Check\n\t");
 		sem_signal(mutex[k]);
 		sem_signal(full);
+		fsleep(sleeptime);
 		++k;
 		if (k == buffer_size) k = 0;
 	}
@@ -335,33 +353,53 @@ void main(void *pv)
     
     printf("task #%d: I'm the first user task(pv=0x%08x)!\r\n",
             task_getid(), pv);
-	init_graphic(0x115);
+	// init_graphic(0x115);
 	int i = 0;
 	for (i = 0; i < buffer_size; i++)
 	{
 		mutex[i] = sem_create(1);
+		printf("-*mutex created, semid: %d*-\n\r",mutex[i]);
 	}
 	full = sem_create(0);
+	printf("-*full semid: %d*-\n\r",full);
 	empty = sem_create(buffer_size);
+	printf("-*empty semid: %d*-\n\r",empty);
     while(1){
 		unsigned char* stack_consumer, stack_producer, stack_control;
-		unsigned int stack_size = 1024 * 1024;
+		unsigned int stack_size = 4096*4096;
 		int tid_consumer, tid_producer, tid_control;
 		struct control_arg control_pv;
 		struct control_arg* cpv = &control_pv;//need to pass pv through a pointer
-		stack_consumer = (unsigned char*)malloc(stack_size);
 		stack_producer = (unsigned char*)malloc(stack_size);
-		stack_control = (unsigned char*)malloc(stack_size);
-		tid_producer = task_create(stack_producer + stack_size, producer_thread, NULL);
-		tid_consumer = task_create(stack_consumer + stack_size, consumer_thread, NULL);
-		tid_control = task_create(stack_control + stack_size, key_control, cpv);
+		stack_consumer = (unsigned char*)malloc(stack_size);
+
+		// stack_control = (unsigned char*)malloc(stack_size);
+
+		printf("-*STACK INIT FINISHED*-\r\n");
+		printf("-*STACK consumer %x*-\r\n", stack_consumer);
+		printf("-*STACK producer %x*-\r\n", stack_producer);
+		// printf("-*STACK control %x*-\r\n", stack_control);
+
+
+		tid_producer = task_create(stack_producer + stack_size, &producer_thread, NULL);
+		tid_consumer = task_create(stack_consumer + stack_size, &consumer_thread, NULL);
+
+		printf("-*PRODUCER CREATED ID = %d*-\r\n", tid_producer);
+		printf("-*CONSUMER CREATED ID = %d*-\r\n", tid_consumer);
+
+		control_pv.tid_foo1 = tid_consumer;
+		control_pv.tid_foo2 = tid_producer;
+		// tid_control = task_create(stack_control + stack_size, &key_control, cpv);
+		// printf("-*KEY_CTRL CREATED ID = %d*-\r\n", tid_control);
+
 		setpriority(tid_producer, 10);
 		setpriority(tid_consumer, 10);
-
-		
+		// setpriority(tid_control, 0);
 		//why I'm doing this? fuck you
-		free(stack_consumer);
-		free(stack_producer);
+		fsleep(120.0);
+		// free(stack_consumer);
+		// free(stack_producer);
+		// free(stack_control);
     };
     task_exit(0);
 }

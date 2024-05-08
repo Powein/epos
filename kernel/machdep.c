@@ -596,16 +596,16 @@ void syscall(struct context *ctx)
         sys_task_exit(*((int *)(ctx->esp+4)));
         break;
     case SYSCALL_sem_create:
-        sys_sem_create(ctx->esp+4);
+        ctx->eax = sys_sem_create(*((int*)(ctx->esp+4)));
         break;
     case SYSCALL_sem_destroy:
-        sys_sem_destroy(ctx->esp+4);
+        ctx->eax = sys_sem_destroy(*((int*)(ctx->esp+4)));
         break;
     case SYSCALL_sem_wait:
-        sys_sem_wait(ctx->esp+4);
+        ctx->eax = sys_sem_wait(*((int*)(ctx->esp+4)));
         break;
     case SYSCALL_sem_signal:
-        sys_sem_signal(ctx->esp+4);
+        ctx->eax = sys_sem_signal(*((int*)(ctx->esp+4)));
         break;
     case SYSCALL_task_create:
         {

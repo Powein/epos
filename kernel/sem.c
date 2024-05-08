@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include "kernel.h"
 struct Semaphore* sem_head = NULL;
-
+static uint32_t semid = 0;
 struct Semaphore* find_semamphore(int semid) {
     struct Semaphore* temp = sem_head;
     if (temp -> sem_ID == semid) {
@@ -23,7 +23,6 @@ struct Semaphore* find_semamphore(int semid) {
 
 int sys_sem_create(int value)
 {
-    static uint32_t semid = 0;
     semid++;
     struct Semaphore* new_sem = (struct Semaphore*)kmalloc(sizeof(struct Semaphore));
     new_sem -> sem_ID = semid;
@@ -42,7 +41,7 @@ int sys_sem_create(int value)
             }
             temp -> next_semaphore = new_sem;
         }
-        return semid;
+        return new_sem->sem_ID;
     }
     else
         return -1;
@@ -79,6 +78,8 @@ int sys_sem_destroy(int semid)
 int sys_sem_wait(int semid)
 {
     struct Semaphore* sem = (semid);
+    sem = find_semamphore(semid);
+    printk("semid %d is waiting, after wait, value is %d\n\r", sem->sem_ID, sem->value - 1);
     if(!sem) return -1;
     uint32_t flags;
     //The waitq is const
@@ -96,6 +97,7 @@ int sys_sem_wait(int semid)
 int sys_sem_signal(int semid)
 {
     struct Semaphore* sem = find_semamphore(semid);
+    printk("semid %d is signaling, after signal, value is %d\n\r", sem->sem_ID, sem->value + 1);
     if(!sem) return -1;
     uint32_t flags;
     struct wait_que* waitq = sem-> wait_que;
