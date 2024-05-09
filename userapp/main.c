@@ -273,8 +273,8 @@ void render_bar(COLORREF color, int percent, short left_gravity, window_info win
 	return;
 }
 
-#define buffer_size 10
-#define task4_ARRSIZE 400
+#define buffer_size 5
+#define task4_ARRSIZE 600
 static int mutex[buffer_size];
 static int full;
 static int empty;
@@ -285,20 +285,14 @@ static window_info* window_p;
 static window_info* window_c;
 #define render_on
 
-void consumer_bub(int* a, int n, int k)
-{
-
-}
-
 void consumer_thread(void* pv) {
-	printf("ENTER CONSUMER\n\r");
 	COLORREF black = RGB(0,0,0);
 	int i, j, temp;
 	int k = 0;
 	while(1) {
 		sem_wait(full);
 		sem_wait(mutex[k]);
-		window_c->x = (int)(g_graphic_dev.XResolution / buffer_size) * k;
+		window_c->x = window_c-> width* k;
 		int render_y = 0;
 		for (i = 0; i < task4_ARRSIZE; i++)
 		{
@@ -315,17 +309,16 @@ void consumer_thread(void* pv) {
 					while(render_y < task4_ARRSIZE){
 						int length;
 						length = arr[k][render_y];
-						line(window_p->x, window_p->y + render_y, window_p->x + length, window_p-> y + render_y, color_r);
-						line(window_p->x + length, window_p-> y + render_y, window_p->x + window_p->width, window_p-> y + render_y, black);
+						line(window_c->x, window_c->y + render_y, window_c->x + length, window_c-> y + render_y, color_r);
+						line(window_c->x + length, window_c-> y + render_y, window_c->x + window_c->width - 1, window_c-> y + render_y, black);
 						render_y++;
-					}
+					} 
 		}
 		sem_signal(mutex[k]);
 		sem_signal(empty);
-		fsleep(sleeptime);
-		printf("Consumer Check\n\r");
 		++k;
 		if (k == buffer_size) k = 0;
+
 	}
 }
 
@@ -333,34 +326,29 @@ void producer_thread(void* pv) {
 	int k = 0;
 	int i = 0;
 	COLORREF black = RGB(0,0,0);
-	printf("ENTER PRODUCER\n\r");
 
 	srand(time(NULL));
 	while(1) {
 		int render_y = 0;
 		sem_wait(empty);
-		printf("producer get empty\n\r");
 		sem_wait(mutex[k]);
-		printf("producer get mutex\n\r");
 		window_p->x = k * window_p->width;
 		for (i = 0; i < task4_ARRSIZE; i++)
 		{
 			arr[k][i] = rand() % (window_p->width);
-#ifdef render_on
 			int length;
 			length = arr[k][i];
 			line(window_p->x, window_p->y + render_y, window_p->x + length, window_p-> y + render_y, color_l);
 			line(window_p->x + length, window_p-> y + render_y, window_p->x + window_p->width, window_p-> y + render_y, black);
 			render_y++;
-#endif
 		}
-
-		printf("Producer Check\n\t");
 		sem_signal(mutex[k]);
 		sem_signal(full);
-		fsleep(sleeptime);
 		++k;
 		if (k == buffer_size) k = 0;
+		// fsleep(sleeptime);
+
+
 	}
 	free(window_p);
 	return;
@@ -376,7 +364,7 @@ void main(void *pv)
 #ifdef render_on
 	init_graphic(0x115);
 #endif
-    window_p->width = (int)(g_graphic_dev.XResolution / buffer_size) - 1;
+    window_p->width = (int)(g_graphic_dev.XResolution / buffer_size);
 	window_p->height = (int)(g_graphic_dev.YResolution * 0.9);
 	const int x = window_p->height;
 	window_p->y = 0;
@@ -427,7 +415,7 @@ void main(void *pv)
 		// printf("-*KEY_CTRL CREATED ID = %d*-\r\n", tid_control);
 
 		setpriority(tid_producer, 5);
-		setpriority(tid_consumer, 5);
+		setpriority(tid_consumer, 2);
 		// setpriority(tid_control, 0);
 		//why I'm doing this? fuck you
 		fsleep(120.0);

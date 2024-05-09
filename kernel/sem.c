@@ -8,6 +8,7 @@ struct Semaphore* sem_head = NULL;
 static uint32_t semid = 0;
 struct Semaphore* find_semamphore(int semid) {
     struct Semaphore* temp = sem_head;
+    if(!temp) return;
     if (temp -> sem_ID == semid) {
         return temp;
     }
@@ -88,7 +89,8 @@ int sys_sem_wait(int semid)
     //The waitq is const
     //There is no need to lock it
     save_flags_cli(flags);
-    if (--sem -> value < 0) {
+    sem->value--;
+    if (sem -> value < 0) {
     //when sem<0, need to block current task
         sleep_on(&sem -> wait_que);
     }
@@ -105,7 +107,8 @@ int sys_sem_signal(int semid)
     if(sem == NULL) return -1;
     uint32_t flags;
     save_flags_cli(flags);
-    if (++sem -> value < 0)
+    sem->value++;
+    if (sem -> value <= 0)
     //when the sem<=0, there must be >=1 blocked task
     //wake one task up
         wake_up(&sem-> wait_que, 1);
