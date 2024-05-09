@@ -105,7 +105,7 @@ int sys_sem_signal(int semid)
     if(sem == NULL) return -1;
     uint32_t flags;
     save_flags_cli(flags);
-    if (++sem -> value <= 0)
+    if (++sem -> value < 0)
     //when the sem<=0, there must be >=1 blocked task
     //wake one task up
         wake_up(&sem-> wait_que, 1);
