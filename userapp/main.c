@@ -66,6 +66,8 @@ void fsleep(float sec) {
 
 COLORREF color_l = RGB(66, 255, 255);
 COLORREF color_r = RGB(99, 255, 88);
+COLORREF yellow = RGB(255, 255, 0);
+COLORREF red = RGB(255, 0, 0);
 // //冒泡排序
 // void bubsort1(int* a, int n){
 // 	int i, j, temp;
@@ -246,10 +248,8 @@ void render_array(COLORREF color, int* arr, int size, window_info* windowInfo) {
         int render_thickness = (int) temp;
         for (; i < render_thickness; i++)
         {	
-
         }
     }
-	printf("RENDERED\n\r");
 }
 
 void render_bar(COLORREF color, int percent, short left_gravity, window_info windowInfo) {
@@ -283,7 +283,7 @@ static int arr[buffer_size][task4_ARRSIZE];
 #define render_on
 static window_info* window_p;
 static window_info* window_c;
-#define render_on
+
 
 void consumer_thread(void* pv) {
 	COLORREF black = RGB(0,0,0);
@@ -309,7 +309,7 @@ void consumer_thread(void* pv) {
 					while(render_y < task4_ARRSIZE){
 						int length;
 						length = arr[k][render_y];
-						line(window_c->x, window_c->y + render_y, window_c->x + length, window_c-> y + render_y, color_r);
+						line(window_c->x, window_c->y + render_y, window_c->x + length, window_c-> y + render_y, yellow + (yellow - red) * (int)(length/window_c->width));
 						line(window_c->x + length, window_c-> y + render_y, window_c->x + window_c->width - 1, window_c-> y + render_y, black);
 						render_y++;
 					} 
@@ -338,7 +338,7 @@ void producer_thread(void* pv) {
 			arr[k][i] = rand() % (window_p->width);
 			int length;
 			length = arr[k][i];
-			line(window_p->x, window_p->y + render_y, window_p->x + length, window_p-> y + render_y, color_l);
+			line(window_p->x, window_p->y + render_y, window_p->x + length, window_p-> y + render_y, yellow + (yellow - red) * (int)(length/window_p->width));
 			line(window_p->x + length, window_p-> y + render_y, window_p->x + window_p->width, window_p-> y + render_y, black);
 			render_y++;
 		}
@@ -394,8 +394,7 @@ void main(void *pv)
 		struct control_arg* cpv = &control_pv;//need to pass pv through a pointer
 		stack_producer = (unsigned char*)malloc(stack_size);
 		stack_consumer = (unsigned char*)malloc(stack_size);
-
-		// stack_control = (unsigned char*)malloc(stack_size);
+		stack_control = (unsigned char*)malloc(stack_size);
 
 		printf("-*STACK INIT FINISHED*-\r\n");
 		printf("-*STACK consumer %x*-\r\n", stack_consumer);
@@ -405,23 +404,23 @@ void main(void *pv)
 
 		tid_producer = task_create(stack_producer + stack_size, &producer_thread, NULL);
 		tid_consumer = task_create(stack_consumer + stack_size, &consumer_thread, NULL);
-
+		tid_control = task_create(stack_control + stack_size, &key_control, cpv);
 		printf("-*PRODUCER CREATED ID = %d*-\r\n", tid_producer);
 		// printf("-*CONSUMER CREATED ID = %d*-\r\n", tid_consumer);
 
 		control_pv.tid_foo1 = tid_consumer;
 		control_pv.tid_foo2 = tid_producer;
-		// tid_control = task_create(stack_control + stack_size, &key_control, cpv);
+
 		// printf("-*KEY_CTRL CREATED ID = %d*-\r\n", tid_control);
 
 		setpriority(tid_producer, 5);
 		setpriority(tid_consumer, 2);
-		// setpriority(tid_control, 0);
+		setpriority(tid_control, 0);
 		//why I'm doing this? fuck you
 		fsleep(120.0);
-		// free(stack_consumer);
-		// free(stack_producer);
-		// free(stack_control);
+		free(stack_consumer);
+		free(stack_producer);
+		free(stack_control);
 		free(window_c);
 		free(window_p);
     };
