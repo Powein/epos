@@ -3,6 +3,7 @@
  */
 #include <stddef.h>
 #include "kernel.h"
+#define SEM_debug
 struct Semaphore* sem_head = NULL;
 static uint32_t semid = 0;
 struct Semaphore* find_semamphore(int semid) {
@@ -79,7 +80,9 @@ int sys_sem_wait(int semid)
 {
     struct Semaphore* sem = (semid);
     sem = find_semamphore(semid);
+#ifdef SEM_debug
     printk("semid %d is waiting, after wait, value is %d\n\r", sem->sem_ID, sem->value - 1);
+#endif
     if(!sem) return -1;
     uint32_t flags;
     //The waitq is const
@@ -96,7 +99,9 @@ int sys_sem_wait(int semid)
 int sys_sem_signal(int semid)
 {
     struct Semaphore* sem = find_semamphore(semid);
+#ifdef SEM_debug
     printk("semid %d is signaling, after signal, value is %d\n\r", sem->sem_ID, sem->value + 1);
+#endif
     if(sem == NULL) return -1;
     uint32_t flags;
     save_flags_cli(flags);

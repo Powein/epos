@@ -208,9 +208,14 @@ void render_array(COLORREF color, int* arr, int size, window_info* windowInfo) {
 	X_pos = windowInfo->x;
 	X_size = windowInfo->width;
 	Y_pos = windowInfo->y;
+	int y_reso = windowInfo->height;
+	// printf("X pos%d\n\r",X_pos);
+	// printf("X size%d\n\r",X_size);
+	// printf("Y pos%d\n\r",Y_pos);
+	// printf("Y reso%d\n\r",y_reso);
 
     // int y_reso = g_graphic_dev.YResolution;
-	int y_reso = windowInfo->height;
+
     int j = 0;
     int max = 0;
     int min = 100;
@@ -226,10 +231,12 @@ void render_array(COLORREF color, int* arr, int size, window_info* windowInfo) {
             min = arr[j];
         }
     }
+	// printf("BINCHECK\n\r");
     j = 0;
     int y_step = (int) y_reso / size;
     for (; j < size; j++)
     {	
+		// printf("BINCHECK\n\r");
         int y = Y_pos + y_step * j;
         float temp = (arr[j] * X_size)/ max;
         int X_len = (int) temp; 
@@ -238,11 +245,11 @@ void render_array(COLORREF color, int* arr, int size, window_info* windowInfo) {
         temp = ratio * y_step;
         int render_thickness = (int) temp;
         for (; i < render_thickness; i++)
-        {
-            line(X_pos, y + i, X_pos + X_len, y + i, fade_color);
-            line(X_pos + X_len, y + i, X_pos + X_size, y + i, default_black);
+        {	
+
         }
     }
+	printf("RENDERED\n\r");
 }
 
 void render_bar(COLORREF color, int percent, short left_gravity, window_info windowInfo) {
@@ -267,47 +274,52 @@ void render_bar(COLORREF color, int percent, short left_gravity, window_info win
 }
 
 #define buffer_size 10
-#define task4_ARRSIZE 50
+#define task4_ARRSIZE 400
 static int mutex[buffer_size];
 static int full;
 static int empty;
 static int arr[buffer_size][task4_ARRSIZE];
-#define sleeptime 0.1
+#define sleeptime 1
+#define render_on
 static window_info* window_p;
 static window_info* window_c;
-// #define render_on
+#define render_on
 
 void consumer_bub(int* a, int n, int k)
 {
 
-	window_c->x = (int)(g_graphic_dev.XResolution / buffer_size) * k;
-	int i, j, temp;
-	for (i = 0; i < n; i++)
-	{
-		for (j = 0; j < n - i - 1; j++)
-		{
-			if (a[j] > a[j + 1])
-			{
-				temp = a[j];
-				a[j] = a[j + 1];
-				a[j + 1] = temp;
-#ifdef render_on
-				
-				render_array(color_r, a, n, window);	//this bring bugs
-#endif
-			}
-		}
-	}
 }
 
 void consumer_thread(void* pv) {
-	int k = 0;
-	int i = 0;
 	printf("ENTER CONSUMER\n\r");
+	COLORREF black = RGB(0,0,0);
+	int i, j, temp;
+	int k = 0;
 	while(1) {
 		sem_wait(full);
 		sem_wait(mutex[k]);
-		consumer_bub(arr[k], task4_ARRSIZE, k);
+		window_c->x = (int)(g_graphic_dev.XResolution / buffer_size) * k;
+		int render_y = 0;
+		for (i = 0; i < task4_ARRSIZE; i++)
+		{
+			for (j = 0; j < task4_ARRSIZE - i - 1; j++)
+			{
+				if (arr[k][j] > arr[k][j + 1])
+				{
+					temp = arr[k][j];
+					arr[k][j] = arr[k][j + 1];
+					arr[k][j + 1] = temp;
+				}
+			}
+					render_y = 0;
+					while(render_y < task4_ARRSIZE){
+						int length;
+						length = arr[k][render_y];
+						line(window_p->x, window_p->y + render_y, window_p->x + length, window_p-> y + render_y, color_r);
+						line(window_p->x + length, window_p-> y + render_y, window_p->x + window_p->width, window_p-> y + render_y, black);
+						render_y++;
+					}
+		}
 		sem_signal(mutex[k]);
 		sem_signal(empty);
 		fsleep(sleeptime);
@@ -320,11 +332,12 @@ void consumer_thread(void* pv) {
 void producer_thread(void* pv) {
 	int k = 0;
 	int i = 0;
+	COLORREF black = RGB(0,0,0);
 	printf("ENTER PRODUCER\n\r");
-	window_info* window_p = (window_info*) malloc(sizeof(window_info));
 
 	srand(time(NULL));
 	while(1) {
+		int render_y = 0;
 		sem_wait(empty);
 		printf("producer get empty\n\r");
 		sem_wait(mutex[k]);
@@ -332,9 +345,13 @@ void producer_thread(void* pv) {
 		window_p->x = k * window_p->width;
 		for (i = 0; i < task4_ARRSIZE; i++)
 		{
-			arr[k][i] = rand() % (4 * task4_ARRSIZE);
+			arr[k][i] = rand() % (window_p->width);
 #ifdef render_on
-			render_array(color_l, arr[k], task4_ARRSIZE, window_p);
+			int length;
+			length = arr[k][i];
+			line(window_p->x, window_p->y + render_y, window_p->x + length, window_p-> y + render_y, color_l);
+			line(window_p->x + length, window_p-> y + render_y, window_p->x + window_p->width, window_p-> y + render_y, black);
+			render_y++;
 #endif
 		}
 
@@ -352,31 +369,35 @@ void producer_thread(void* pv) {
 
 void main(void *pv)
 {
-    window_p->width = (int)(g_graphic_dev.XResolution / buffer_size) - 1;
-	window_p->height = (int)(g_graphic_dev.YResolution * 0.9);
-	window_p->y = 0;
-	window_p->x = 0;
 
-	window_c = (window_info*)malloc(sizeof(window_info));
-	window_c->width = (int)(g_graphic_dev.XResolution / buffer_size);
-	window_c->height = (int)(g_graphic_dev.YResolution * 0.9);
-	window_c->y = 0;
 
     printf("task #%d: I'm the first user task(pv=0x%08x)!\r\n",
             task_getid(), pv);
 #ifdef render_on
 	init_graphic(0x115);
 #endif
+    window_p->width = (int)(g_graphic_dev.XResolution / buffer_size) - 1;
+	window_p->height = (int)(g_graphic_dev.YResolution * 0.9);
+	const int x = window_p->height;
+	window_p->y = 0;
+	window_p->x = 0;
+	window_c = (window_info*)malloc(sizeof(window_info));
+	window_c->width = (int)(g_graphic_dev.XResolution / buffer_size);
+	window_c->height = (int)(g_graphic_dev.YResolution * 0.9);
+	window_c->y = 0;
+
+	// printf("window_height %d",window_p->height);
+	// fsleep(10);
 	int i = 0;
 	for (i = 0; i < buffer_size; i++)
 	{
 		mutex[i] = sem_create(1);
-		printf("-*mutex created, semid: %d*-\n\r",mutex[i]);
+		// printf("-*mutex created, semid: %d*-\n\r",mutex[i]);
 	}
 	full = sem_create(0);
-	printf("-*full semid: %d*-\n\r",full);
+	// printf("-*full semid: %d*-\n\r",full);
 	empty = sem_create(buffer_size);
-	printf("-*empty semid: %d*-\n\r",empty);
+	// printf("-*empty semid: %d*-\n\r",empty);
     while(1){
 		unsigned char* stack_consumer, stack_producer, stack_control;
 		unsigned int stack_size = 4096*4096;
@@ -405,8 +426,8 @@ void main(void *pv)
 		// tid_control = task_create(stack_control + stack_size, &key_control, cpv);
 		// printf("-*KEY_CTRL CREATED ID = %d*-\r\n", tid_control);
 
-		setpriority(tid_producer, 1);
-		setpriority(tid_consumer, 0);
+		setpriority(tid_producer, 5);
+		setpriority(tid_consumer, 5);
 		// setpriority(tid_control, 0);
 		//why I'm doing this? fuck you
 		fsleep(120.0);
