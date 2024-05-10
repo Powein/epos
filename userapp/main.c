@@ -46,10 +46,8 @@ void bubsort1(int* a, int n);
 void bubsort2(int* a, int n);
 void tsk_foo1(void* pv);
 void tsk_foo2(void* pv);
-void key_control(void* pv);
 void render_array(COLORREF color, int* a, int n, window_info* window);
 void render_bar(COLORREF color, int percent, short left_gravity, window_info window);
-void mySleep();
 #define MATSIZE 4
 typedef float matrix[MATSIZE * MATSIZE];
 typedef float vector[MATSIZE];
@@ -63,218 +61,10 @@ void fsleep(float sec) {
 	nanosleep(&tim, &tim2);
 }
 
-
 COLORREF color_l = RGB(66, 255, 255);
 COLORREF color_r = RGB(99, 255, 88);
-COLORREF yellow = RGB(255, 255, 0);
-COLORREF red = RGB(255, 0, 0);
-// //冒泡排序
-// void bubsort1(int* a, int n){
-// 	int i, j, temp;
-// 	for (i = 0; i < n; i++)
-// 	{
-// 		for (j = 0; j < n - i - 1; j++)
-// 		{
-// 			if (a[j] > a[j + 1])
-// 			{
-// 				temp = a[j];
-// 				a[j] = a[j + 1];
-// 				a[j + 1] = temp;
-// 				window_info window1 = {710, 850, 0, 0};
-// 				render_array(color_r, a, n, window1);
-// 			}
-// 			//mySleep();
-// 		}
-// 		mySleep();
-// 	}
-// }
-
-// void bubsort2(int* a, int n)
-// {
-// 	int i, j, temp;
-// 	for (i = 0; i < n; i++)
-// 	{
-// 		for (j = 0; j < n - i - 1; j++)
-// 		{
-// 			if (a[j] > a[j + 1])
-// 			{
-// 				temp = a[j];
-// 				a[j] = a[j + 1];
-// 				a[j + 1] = temp;
-// 				window_info window2 = {710, 850, 720, 0};
-// 				render_array(color_l, a, n, window2);
-// 			}
-// 		}
-// 		mySleep();
-// 	}
-// }
-// #define ARRSIZE 50
-// //线程函数
-// void tsk_foo1(void* pv)
-// {
-// 	time_t time(time_t * loc);
-// 	srand(time(NULL));
-// 	int myCount_1[ARRSIZE];
-// 	int i;
-// 	for (i = 0; i < ARRSIZE; i++)
-// 	{
-// 		myCount_1[i] = rand() % 200;
-// 		printf("%d\n", myCount_1[i]);
-// 	}
-// 	window_info window = {710, 850, 0, 0};
-// 	render_array(color_l, myCount_1, ARRSIZE, window);
-// 	mySleep();
-// 	bubsort1(myCount_1, ARRSIZE);
-// 	task_exit(0);
-// }
-
-// void tsk_foo2(void* pv)
-// {
-// 	time_t time(time_t * loc);
-// 	srand(time(NULL));
-// 	int myCount_2[ARRSIZE];
-// 	int i;
-// 	for (i = 0; i < ARRSIZE; i++)
-// 	{
-// 		myCount_2[i] = rand() % 200;
-// 		printf("%d\n", myCount_2[i]);
-// 	}
-// 	//显示未排序的画面
-// 	window_info window = {710, 850, 720, 0};
-// 	render_array(color_r, myCount_2, ARRSIZE, window);
-// 	mySleep();
-// 	bubsort2(myCount_2, ARRSIZE);
-// 	task_exit(0);
-// }
-
-//控制线程
-void key_control(void* pv) {
-#define LEFT_GRAV 1
-#define RIGHT_GRAV 2
-	struct control_arg* px = (struct control_arg*) pv;
-	int tid_foo1 = px->tid_foo1;
-	int tid_foo2 = px->tid_foo2;
-	int percent_l = (int)(getpriority(tid_foo1) * 100 / 127);
-	int percent_r = (int)(getpriority(tid_foo2) * 100 / 127);
-	window_info window_l;
-	window_info window_r;
-	//The bar may be a little fat..
-	window_r.width = (int)(g_graphic_dev.XResolution / 2);
-	window_l.height = (int)(g_graphic_dev.YResolution * 0.18);//coopreate with another part, may see consumer and producer thread
-	window_r.x = (int)(g_graphic_dev.XResolution * 0.5);
-	window_l.x = 0;
-	window_r.y = (int)(g_graphic_dev.YResolution * 0.80);
-	window_l.y = (int)(g_graphic_dev.YResolution * 0.80);
-
-	render_bar(color_r, percent_l, RIGHT_GRAV, window_l);
-	render_bar(color_l, percent_r, LEFT_GRAV, window_r);
-
-	int mykeypress = 0x0;
-	while (1) {
-		mykeypress = getchar();
-		switch (mykeypress)
-		{
-		case 0x4800://(up)
-		{
-			setpriority(tid_foo1, getpriority(tid_foo1) + 1);
-			render_bar(color_r, getpriority(tid_foo1), RIGHT_GRAV, window_l);
-		}
-		break;
-		case 0x5000://(down)
-		{
-			setpriority(tid_foo1, getpriority(tid_foo1)-1);
-			render_bar(color_r, getpriority(tid_foo1), RIGHT_GRAV, window_l);
-		}
-		break;
-//0x4d00(right)/0x4b00(left)
-		case 0x4d00:
-		{
-			setpriority(tid_foo2, getpriority(tid_foo2) + 1);
-			render_bar(color_l, getpriority(tid_foo2), LEFT_GRAV, window_r);
-		}
-		break;
-		case 0x4b00:
-		{
-			setpriority(tid_foo2, getpriority(tid_foo2) - 1);
-			render_bar(color_l, getpriority(tid_foo2), LEFT_GRAV, window_r);
-		}
-		break;
-		default:
-			break;
-		}
-	}
-}
-
-void render_array(COLORREF color, int* arr, int size, window_info* windowInfo) {
-	int  X_pos, X_size, Y_pos;
-	X_pos = windowInfo->x;
-	X_size = windowInfo->width;
-	Y_pos = windowInfo->y;
-	int y_reso = windowInfo->height;
-	// printf("X pos%d\n\r",X_pos);
-	// printf("X size%d\n\r",X_size);
-	// printf("Y pos%d\n\r",Y_pos);
-	// printf("Y reso%d\n\r",y_reso);
-
-    // int y_reso = g_graphic_dev.YResolution;
-
-    int j = 0;
-    int max = 0;
-    int min = 100;
-    float ratio = RATIO;
-    COLORREF default_black = RGB(0, 0, 0);
-    for (; j < size; j++)
-    {
-        if (arr[j] > max)
-        {
-            max = arr[j];
-        } else if (arr[j] < min)
-        {
-            min = arr[j];
-        }
-    }
-	// printf("BINCHECK\n\r");
-    j = 0;
-    int y_step = (int) y_reso / size;
-    for (; j < size; j++)
-    {	
-		// printf("BINCHECK\n\r");
-        int y = Y_pos + y_step * j;
-        float temp = (arr[j] * X_size)/ max;
-        int X_len = (int) temp; 
-		COLORREF fade_color = color + (int)((float)X_len / 5);
-        int i = 0;
-        temp = ratio * y_step;
-        int render_thickness = (int) temp;
-        for (; i < render_thickness; i++)
-        {	
-        }
-    }
-}
-
-void render_bar(COLORREF color, int percent, short left_gravity, window_info windowInfo) {
-	float percent_ = (float)percent / 45; //magic number, do not change unless piority system is changed
-	color = color + 4*percent;
-	if (left_gravity == 1){
-		size_t y = windowInfo.y;
-		for (; y < windowInfo.y + windowInfo.height; y++)
-			{
-				line(windowInfo.x, y, (int)(windowInfo.x + windowInfo.width * percent_), y, color);
-				line((int)(windowInfo.x + windowInfo.width * percent_), y, windowInfo.x + windowInfo.width, y, RGB(0, 0, 0));
-			}
-	} else {
-		size_t y = windowInfo.y;
-		for (; y < windowInfo.y + windowInfo.height; y++)
-			{
-				line(windowInfo.x + windowInfo.width, y, (int)(windowInfo.x + windowInfo.width - windowInfo.width * percent_), y, color);
-				line((int)(windowInfo.x + windowInfo.width - windowInfo.width * percent_), y, windowInfo.x, y, RGB(0, 0, 0));
-			}
-	}
-	return;
-}
-
 #define buffer_size 5
-#define task4_ARRSIZE 600
+#define task4_ARRSIZE 690
 static int mutex[buffer_size];
 static int full;
 static int empty;
@@ -283,6 +73,16 @@ static int arr[buffer_size][task4_ARRSIZE];
 #define render_on
 static window_info* window_p;
 static window_info* window_c;
+static window_info* window_ctrl;
+static struct control_arg* cpv;
+typedef  struct fadeColor
+{
+	float r;
+	float g;
+	float b;
+} fadeColor;
+fadeColor c1 = {(float) 0x00,(float) 0xFF,(float) 0xB3};
+fadeColor c2 = {(float) 0xFF,(float) 0x7A,(float) 0xE4};
 
 
 void consumer_thread(void* pv) {
@@ -304,15 +104,19 @@ void consumer_thread(void* pv) {
 					arr[k][j] = arr[k][j + 1];
 					arr[k][j + 1] = temp;
 				}
+				while(render_y < task4_ARRSIZE){
+					int length;
+					length = arr[k][render_y];
+					line(window_c->x, window_c->y + render_y, window_c->x + length, window_c-> y + render_y,RGB(
+						(int)(c1.r + (c1.r - c2.r) * ((float)length/(float)window_p->width)),
+						(int)(c1.g + (c1.g - c2.g) * ((float)length/(float)window_p->width)),
+						(int)(c1.b + (c1.b - c2.b) * ((float)length/(float)window_p->width))));
+					line(window_c->x + length, window_c-> y + render_y, window_c->x + window_c->width - 1, window_c-> y + render_y, black);
+					render_y++;
+				} 
 			}
 					render_y = 0;
-					while(render_y < task4_ARRSIZE){
-						int length;
-						length = arr[k][render_y];
-						line(window_c->x, window_c->y + render_y, window_c->x + length, window_c-> y + render_y, yellow + (yellow - red) * (int)(length/window_c->width));
-						line(window_c->x + length, window_c-> y + render_y, window_c->x + window_c->width - 1, window_c-> y + render_y, black);
-						render_y++;
-					} 
+
 		}
 		sem_signal(mutex[k]);
 		sem_signal(empty);
@@ -338,9 +142,13 @@ void producer_thread(void* pv) {
 			arr[k][i] = rand() % (window_p->width);
 			int length;
 			length = arr[k][i];
-			line(window_p->x, window_p->y + render_y, window_p->x + length, window_p-> y + render_y, yellow + (yellow - red) * (int)(length/window_p->width));
+			line(window_p->x, window_p->y + render_y, window_p->x + length, window_p-> y + render_y, RGB(
+						(int)(c1.r + (c1.r - c2.r) * ((float)length/(float)window_c->width)),
+						(int)(c1.g + (c1.g - c2.g) * ((float)length/(float)window_c->width)),
+						(int)(c1.b + (c1.b - c2.b) * ((float)length/(float)window_c->width))));
 			line(window_p->x + length, window_p-> y + render_y, window_p->x + window_p->width, window_p-> y + render_y, black);
 			render_y++;
+			fsleep(0.06);
 		}
 		sem_signal(mutex[k]);
 		sem_signal(full);
@@ -354,6 +162,128 @@ void producer_thread(void* pv) {
 	return;
 }
 
+void key_control() {
+	int tid_foo1 = cpv->tid_foo1;
+	int tid_foo2 = cpv->tid_foo2;
+	int x;
+	double percent_l = (double)((float)getpriority(tid_foo1) /39.0f);
+	double percent_r = (double)((float)getpriority(tid_foo2) /39.0f);
+	for (x = 0; x < window_ctrl->width * percent_l; x++)
+	{
+		line(x,window_ctrl->y,
+			x,window_ctrl->y+window_ctrl->height/2,RGB(
+				(int)(c2.r - (c2.r - c1.r) * ((float)x/(float)window_ctrl->width)),
+				(int)(c2.g - (c2.g - c1.g) * ((float)x/(float)window_ctrl->width)),
+				(int)(c2.b - (c2.b - c1.b) * ((float)x/(float)window_ctrl->width))));
+	}
+	for (; x < window_ctrl->width; x++)
+	{
+		line(x,window_ctrl->y,
+		x,window_ctrl->y+window_ctrl->height/2,RGB(0,0,0));
+	}
+
+	for (x = 0; x < window_ctrl->width * percent_r; x++)
+	{
+		line(x,window_ctrl->y+window_ctrl->height/2 + 2,
+			x,window_ctrl->y+window_ctrl->height,RGB(
+				(int)(c1.r - (c1.r - c2.r) * ((float)x/(float)window_ctrl->width)),
+				(int)(c1.g - (c1.g - c2.g) * ((float)x/(float)window_ctrl->width)),
+				(int)(c1.b - (c1.b - c2.b) * ((float)x/(float)window_ctrl->width))));
+	}
+	for (; x < window_ctrl->width; x++)
+	{
+		line(x,window_ctrl->y+window_ctrl->height/2 + 2,
+		x,window_ctrl->y+window_ctrl->height,RGB(0,0,0));
+	}
+
+	int mykeypress = 0x0;
+	while (1) {
+		mykeypress = getchar();
+		switch (mykeypress)
+		{
+		case 0x4800://(up)
+		{
+		setpriority(tid_foo1, getpriority(tid_foo1) + 1);
+		percent_l = (double)((float)getpriority(tid_foo1) / 39.0f);
+		for (x = 0; x < window_ctrl->width * percent_l; x++)
+		{
+			line(x,window_ctrl->y,
+				x,window_ctrl->y+window_ctrl->height/2,RGB(
+					(int)(c2.r - (c2.r - c1.r) * ((float)x/(float)window_ctrl->width)),
+					(int)(c2.g - (c2.g - c1.g) * ((float)x/(float)window_ctrl->width)),
+					(int)(c2.b - (c2.b - c1.b) * ((float)x/(float)window_ctrl->width))));
+		}
+		for (; x < window_ctrl->width; x++)
+		{
+			line(x,window_ctrl->y,
+			x,window_ctrl->y+window_ctrl->height/2,RGB(0,0,0));
+		}
+		}
+		break;
+		case 0x5000://(down)
+		{
+		setpriority(tid_foo1, getpriority(tid_foo1)-1);
+		percent_l = (float)((float)getpriority(tid_foo1) /39.0f);
+		for (x = 0; x < window_ctrl->width * percent_l; x++)
+		{
+			line(x,window_ctrl->y,
+				x,window_ctrl->y+window_ctrl->height/2,RGB(
+					(int)(c2.r - (int)(c2.r - c1.r) * ((float)x/(float)window_ctrl->width)),
+					(int)(c2.g - (int)(c2.g - c1.g) * ((float)x/(float)window_ctrl->width)),
+					(int)(c2.b - (int)(c2.b - c1.b) * ((float)x/(float)window_ctrl->width))));
+		}
+		for (; x < window_ctrl->width; x++)
+		{
+			line(x,window_ctrl->y,
+			x,window_ctrl->y+window_ctrl->height/2,RGB(0,0,0));
+		}
+		}
+		break;
+//0x4d00(right)/0x4b00(left)
+		case 0x4d00:
+		{
+		setpriority(tid_foo2, getpriority(tid_foo2)+1);
+		percent_r = (float)((float)getpriority(tid_foo2) /39.0f);
+		for (x = 0; x < window_ctrl->width * percent_r; x++)
+		{
+			line(x,window_ctrl->y+window_ctrl->height/ 2 + 2,
+				x,window_ctrl->y+window_ctrl->height,RGB(
+					(int)(c1.r - (int)(c1.r - c2.r) * ((float)x/(float)window_ctrl->width)),
+					(int)(c1.g - (int)(c1.g - c2.g) * ((float)x/(float)window_ctrl->width)),
+					(int)(c1.b - (int)(c1.b - c2.b) * ((float)x/(float)window_ctrl->width))));
+		}
+		for (; x < window_ctrl->width; x++)
+		{
+			line(x,window_ctrl->y+window_ctrl->height/2 + 2,
+			x,window_ctrl->y+window_ctrl->height,RGB(0,0,0));
+		}
+		
+		}
+		break;
+		case 0x4b00:
+		{
+		setpriority(tid_foo2, getpriority(tid_foo2)-1);
+		percent_r = (float)((float)getpriority(tid_foo2) /39.0f);
+		for (x = 0; x < window_ctrl->width * percent_r; x++)
+		{
+			line(x,window_ctrl->y+window_ctrl->height/2 + 2,
+				x,window_ctrl->y+window_ctrl->height,RGB(
+					(int)(c1.r - (c1.r - c2.r) * ((float)x/(float)window_ctrl->width)),
+					(int)(c1.g - (c1.g - c2.g) * ((float)x/(float)window_ctrl->width)),
+					(int)(c1.b - (c1.b - c2.b) * ((float)x/(float)window_ctrl->width))));
+		}
+		for (; x < window_ctrl->width; x++)
+		{
+			line(x,window_ctrl->y+window_ctrl->height/2 + 2,
+			x,window_ctrl->y+window_ctrl->height,RGB(0,0,0));
+		}
+		}
+		break;
+		default:
+			break;
+		}
+	}
+}
 
 void main(void *pv)
 {
@@ -362,20 +292,27 @@ void main(void *pv)
     printf("task #%d: I'm the first user task(pv=0x%08x)!\r\n",
             task_getid(), pv);
 #ifdef render_on
-	init_graphic(0x115);
+	init_graphic(0x0118);
 #endif
+	window_p = (window_info*)malloc(sizeof(window_info));
+	window_c = (window_info*)malloc(sizeof(window_info));
+	window_ctrl = (window_info*)malloc(sizeof(window_info));
+
     window_p->width = (int)(g_graphic_dev.XResolution / buffer_size);
 	window_p->height = (int)(g_graphic_dev.YResolution * 0.9);
-	const int x = window_p->height;
 	window_p->y = 0;
 	window_p->x = 0;
-	window_c = (window_info*)malloc(sizeof(window_info));
+
 	window_c->width = (int)(g_graphic_dev.XResolution / buffer_size);
 	window_c->height = (int)(g_graphic_dev.YResolution * 0.9);
 	window_c->y = 0;
 
+	window_ctrl->y = (int)(g_graphic_dev.YResolution*0.9);
+	window_ctrl->x = 0;
+	window_ctrl->height = g_graphic_dev.YResolution - window_ctrl->y;
+	window_ctrl->width = g_graphic_dev.XResolution;
+
 	// printf("window_height %d",window_p->height);
-	// fsleep(10);
 	int i = 0;
 	for (i = 0; i < buffer_size; i++)
 	{
@@ -387,69 +324,53 @@ void main(void *pv)
 	empty = sem_create(buffer_size);
 	// printf("-*empty semid: %d*-\n\r",empty);
     while(1){
-		unsigned char* stack_consumer, stack_producer, stack_control;
-		unsigned int stack_size = 4096*4096;
+		int stack_consumer, stack_producer, stack_control;
+		int stack_size_c = 4096*6000;
+		int stack_size_p = 4096*4096;
+		int stack_size_ctl = 4096*2048;
 		int tid_consumer, tid_producer, tid_control;
-		struct control_arg control_pv;
-		struct control_arg* cpv = &control_pv;//need to pass pv through a pointer
-		stack_producer = (unsigned char*)malloc(stack_size);
-		stack_consumer = (unsigned char*)malloc(stack_size);
-		stack_control = (unsigned char*)malloc(stack_size);
+		cpv = (struct control_arg*)(malloc(sizeof(struct control_arg)));//need to pass pv through a pointer
+		stack_producer = (int)malloc(stack_size_c);
+		stack_consumer = (int)malloc(stack_size_p);
+		stack_control = (int)malloc(stack_size_ctl);
+
+		char* _stack_producer = (char*)(stack_size_p +  stack_producer);
+		char* _stack_consumer = (char*)(stack_size_c +  stack_consumer);
+		char* _stack_control = (char*)(stack_size_ctl +  stack_control);
 
 		printf("-*STACK INIT FINISHED*-\r\n");
 		printf("-*STACK consumer %x*-\r\n", stack_consumer);
 		printf("-*STACK producer %x*-\r\n", stack_producer);
 		printf("-*STACK control %x*-\r\n", stack_control);
 
+		void* p = NULL;
+		tid_producer = task_create(_stack_producer, producer_thread, p);
+		tid_consumer = task_create(_stack_consumer, consumer_thread, p);
+		
+		cpv->tid_foo1 = tid_consumer;
+		cpv->tid_foo2 = tid_producer;
+		tid_control = task_create(_stack_control, key_control, p);
 
-		tid_producer = task_create(stack_producer + stack_size, &producer_thread, NULL);
-		tid_consumer = task_create(stack_consumer + stack_size, &consumer_thread, NULL);
-		tid_control = task_create(stack_control + stack_size, &key_control, cpv);
-		printf("-*PRODUCER CREATED ID = %d*-\r\n", tid_producer);
+		printf("-*control PID %x*-\r\n", tid_control);
+		printf("-*consumer PID %x*-\r\n", tid_consumer);
+		printf("-*producer PID %x*-\r\n", tid_producer);
 		// printf("-*CONSUMER CREATED ID = %d*-\r\n", tid_consumer);
 
-		control_pv.tid_foo1 = tid_consumer;
-		control_pv.tid_foo2 = tid_producer;
+
 
 		// printf("-*KEY_CTRL CREATED ID = %d*-\r\n", tid_control);
 
-		setpriority(tid_producer, 5);
+		setpriority(tid_producer, 2);
 		setpriority(tid_consumer, 2);
 		setpriority(tid_control, 0);
+
+		fsleep(32767);
 		//why I'm doing this? fuck you
-		fsleep(120.0);
-		free(stack_consumer);
-		free(stack_producer);
-		free(stack_control);
-		free(window_c);
-		free(window_p);
+		// free((void*)stack_consumer);
+		// free((void*)stack_producer);
+		// free((void*)stack_control);
+		// free((void*)window_c);
+		// free((void*)window_p);
     };
     task_exit(0);
 }
-
-
-
-
-// void task3(void* pv){
-// 	unsigned char* stack_foo_1, * stack_foo_2, * stack_foo_3;
-// 	unsigned int  stack_size = 1024 * 1024;
-// 	stack_foo_1 = (unsigned char*)malloc(stack_size);
-// 	stack_foo_2 = (unsigned char*)malloc(stack_size);
-// 	stack_foo_3 = (unsigned char*)malloc(stack_size);
-// 	init_graphic(0x017f);
-
-// 	tid_foo1 = task_create(stack_foo_1 + stack_size, &tsk_foo1, (void*)0);
-// 	tid_foo2 = task_create(stack_foo_2 + stack_size, &tsk_foo2, (void*)0);
-// 	tid_foo3 = task_create(stack_foo_3 + stack_size, &key_control, (void*)0);
-// 	setpriority(tid_foo3, 0);
-// 	setpriority(tid_foo1, 10);
-// 	setpriority(tid_foo2, 10);
-
-// 	free(stack_foo_1);
-// 	free(stack_foo_2);
-// 	free(stack_foo_3);
-
-// 	while (1)
-// 		;
-// 	task_exit(0);
-// }
