@@ -52,19 +52,18 @@ void render_bar(COLORREF color, int percent, short left_gravity, window_info win
 typedef float matrix[MATSIZE * MATSIZE];
 typedef float vector[MATSIZE];
 //睡眠函数
-void fsleep(float sec) {
-	struct timespec tim, tim2;
-	int isec = (int)sec;
-	int nsec = (int)(1000000000 * (sec - isec));
-	tim.tv_sec = isec;
-	tim.tv_nsec = nsec;
-	nanosleep(&tim, &tim2);
+void fsleep(int sec, int nsec) {
+	struct timespec *tim = (struct timespec *)malloc(sizeof(struct timespec));
+	tim->tv_sec = sec;
+	tim->tv_nsec = nsec;
+	nanosleep(tim, NULL);
+	free(tim);
 }
 
 COLORREF color_l = RGB(66, 255, 255);
 COLORREF color_r = RGB(99, 255, 88);
 #define buffer_size 5
-#define task4_ARRSIZE 690
+#define task4_ARRSIZE 535
 static int mutex[buffer_size];
 static int full;
 static int empty;
@@ -148,7 +147,8 @@ void producer_thread(void* pv) {
 						(int)(c1.b + (c1.b - c2.b) * ((float)length/(float)window_c->width))));
 			line(window_p->x + length, window_p-> y + render_y, window_p->x + window_p->width, window_p-> y + render_y, black);
 			render_y++;
-			fsleep(0.06);
+			// nanosleep((const struct timespec[]){{0,10000000L}}, NULL);
+			fsleep(0,10000000L);
 		}
 		sem_signal(mutex[k]);
 		sem_signal(full);
@@ -203,7 +203,7 @@ void key_control() {
 		{
 		case 0x4800://(up)
 		{
-		setpriority(tid_foo1, getpriority(tid_foo1) + 1);
+		setpriority(tid_foo1, getpriority(tid_foo1) + 2);
 		percent_l = (double)((float)getpriority(tid_foo1) / 39.0f);
 		for (x = 0; x < window_ctrl->width * percent_l; x++)
 		{
@@ -222,7 +222,7 @@ void key_control() {
 		break;
 		case 0x5000://(down)
 		{
-		setpriority(tid_foo1, getpriority(tid_foo1)-1);
+		setpriority(tid_foo1, getpriority(tid_foo1)-2);
 		percent_l = (float)((float)getpriority(tid_foo1) /39.0f);
 		for (x = 0; x < window_ctrl->width * percent_l; x++)
 		{
@@ -242,7 +242,7 @@ void key_control() {
 //0x4d00(right)/0x4b00(left)
 		case 0x4d00:
 		{
-		setpriority(tid_foo2, getpriority(tid_foo2)+1);
+		setpriority(tid_foo2, getpriority(tid_foo2)+2);
 		percent_r = (float)((float)getpriority(tid_foo2) /39.0f);
 		for (x = 0; x < window_ctrl->width * percent_r; x++)
 		{
@@ -262,7 +262,7 @@ void key_control() {
 		break;
 		case 0x4b00:
 		{
-		setpriority(tid_foo2, getpriority(tid_foo2)-1);
+		setpriority(tid_foo2, getpriority(tid_foo2)-2);
 		percent_r = (float)((float)getpriority(tid_foo2) /39.0f);
 		for (x = 0; x < window_ctrl->width * percent_r; x++)
 		{
@@ -292,7 +292,7 @@ void main(void *pv)
     printf("task #%d: I'm the first user task(pv=0x%08x)!\r\n",
             task_getid(), pv);
 #ifdef render_on
-	init_graphic(0x0118);
+	init_graphic(0x0115);
 #endif
 	window_p = (window_info*)malloc(sizeof(window_info));
 	window_c = (window_info*)malloc(sizeof(window_info));
@@ -325,9 +325,9 @@ void main(void *pv)
 	// printf("-*empty semid: %d*-\n\r",empty);
     while(1){
 		int stack_consumer, stack_producer, stack_control;
-		int stack_size_c = 4096*6000;
-		int stack_size_p = 4096*4096;
-		int stack_size_ctl = 4096*2048;
+		int stack_size_c = 11*1024*1024;
+		int stack_size_p = 11*1024*1024;
+		int stack_size_ctl = 8*1024*1024;
 		int tid_consumer, tid_producer, tid_control;
 		cpv = (struct control_arg*)(malloc(sizeof(struct control_arg)));//need to pass pv through a pointer
 		stack_producer = (int)malloc(stack_size_c);
@@ -346,25 +346,25 @@ void main(void *pv)
 		void* p = NULL;
 		tid_producer = task_create(_stack_producer, producer_thread, p);
 		tid_consumer = task_create(_stack_consumer, consumer_thread, p);
-		
 		cpv->tid_foo1 = tid_consumer;
 		cpv->tid_foo2 = tid_producer;
-		tid_control = task_create(_stack_control, key_control, p);
 
-		printf("-*control PID %x*-\r\n", tid_control);
-		printf("-*consumer PID %x*-\r\n", tid_consumer);
-		printf("-*producer PID %x*-\r\n", tid_producer);
+		tid_control = task_create(_stack_control, key_control, p);
+		setpriority(tid_producer, 10);
+		setpriority(tid_consumer, 10);
+		setpriority(tid_control, 0);
+
+		// printf("-*control PID %x*-\r\n", tid_control);
+		// printf("-*consumer PID %x*-\r\n", tid_consumer);
+		// printf("-*producer PID %x*-\r\n", tid_producer);
 		// printf("-*CONSUMER CREATED ID = %d*-\r\n", tid_consumer);
 
 
 
 		// printf("-*KEY_CTRL CREATED ID = %d*-\r\n", tid_control);
 
-		setpriority(tid_producer, 2);
-		setpriority(tid_consumer, 2);
-		setpriority(tid_control, 0);
 
-		fsleep(32767);
+		fsleep(32767,0);
 		//why I'm doing this? fuck you
 		// free((void*)stack_consumer);
 		// free((void*)stack_producer);

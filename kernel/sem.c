@@ -3,12 +3,12 @@
  */
 #include <stddef.h>
 #include "kernel.h"
-#define SEM_debug
+
 struct Semaphore* sem_head = NULL;
 static uint32_t semid = 0;
 struct Semaphore* find_semamphore(int semid) {
     struct Semaphore* temp = sem_head;
-    if(!temp) return;
+    if(!temp) return NULL;
     if (temp -> sem_ID == semid) {
         return temp;
     }
@@ -75,11 +75,12 @@ int sys_sem_destroy(int semid)
         }
     } else
         return -1;
+    return 0;
 }
 
 int sys_sem_wait(int semid)
 {
-    struct Semaphore* sem = (semid);
+    struct Semaphore* sem;
     sem = find_semamphore(semid);
 #ifdef SEM_debug
     printk("semid %d is waiting, after wait, value is %d\n\r", sem->sem_ID, sem->value - 1);
