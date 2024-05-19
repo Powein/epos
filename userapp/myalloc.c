@@ -4,32 +4,46 @@
 #include <sys/types.h>
 #include <string.h>
 #include <stdint.h>
-
+#include <unistd.h>
 struct chunk {
     char signature[4];  /* "OSEX" */
     struct chunk *next; /* ptr. to next chunk */
     int state;          /* 0 - free, 1 - used */
 #define FREE   0
 #define USED   1
-
     int size;           /* size of this chunk */
 };
-
+int semid;
 static struct chunk *chunk_head;
+// void *tlsf_create_with_pool(uint8_t *heap_base, size_t heap_size)
+// {
+//     chunk_head = (struct chunk *)heap_base;
+//     strncpy(chunk_head->signature, "OSEX", 4);
+//     chunk_head->next = NULL;
+//     chunk_head->state = FREE;
+//     chunk_head->size  = heap_size;
 
+//     return NULL;
+// }
 void init_memory_pool(size_t heap_size, uint8_t *heap_base)
 {
-    chunk_head = (struct chunk *)heap_base;
-    strncpy(chunk_head->signature, "OSEX", 4);
-    chunk_head->next = NULL;
-    chunk_head->state = FREE;
-    chunk_head->size  = heap_size;
+  chunk_head = (struct chunk *)heap_base;
+  strncpy(chunk_head->signature, "OSEX", 4);
+  chunk_head->next = NULL;
+  chunk_head->state = FREE;
+  chunk_head->size  = heap_size;
+  semid = sem_create(1);
 }
+void* g_heap;
+
 
 void *malloc(size_t size){
-    if(size==0)
-        return NULL;
-    //find a free block with enough size
+  sem_wait(semid);
+    if(size==0) {
+      sem_signal(semid);
+      return NULL;
+    }
+
     struct chunk *free_block = NULL;
     free_block = chunk_head;
     while(free_block) {
@@ -38,18 +52,22 @@ void *malloc(size_t size){
         }
         free_block = free_block->next;
     }
-    //no such block found
-    if(free_block==NULL)
-        return NULL;
+
+    if(free_block==NULL){
+      sem_signal(semid);
+      return NULL;
+    }
 
     void *ptr;
     if(strncmp(free_block->signature,"OSEX",4) == 0)//legal block to use
         ptr=(char *)free_block+sizeof(struct chunk);//get the usable address
-    else
-        return NULL;
+    else{
+      sem_signal(semid);
+      return NULL;
+    }
     int freesize=free_block->size - size - sizeof(struct chunk);//freesize for fragment
     if(freesize <= 0) {
-        free_block->state = USED;//freesize is too small to use
+        sem_signal(semid);
         return ptr;
     }
     else {//add a new block for the remaining space
@@ -63,6 +81,7 @@ void *malloc(size_t size){
         free_block->state=USED;
         new->next=free_block->next;
         free_block->next=new;
+        sem_signal(semid);
         return ptr;
     }
 }
@@ -70,65 +89,91 @@ void *malloc(size_t size){
 
 void free(void *ptr)
 {
-    ptr = (char*)ptr;
-    ptr = ptr - sizeof(struct chunk);
-    struct chunk *p = (struct chunk*)ptr;
-    p->state = FREE;
-    struct chunk *merger = NULL;
-    merger = chunk_head;
-    while(merger!= NULL && merger->next!= NULL) {//possible to merge with the next block
-        if (merger->next->state == FREE && merger->state == FREE) {
-            merger->size += merger->next->size + sizeof(struct chunk);
-            merger->next = merger->next->next;
-        } else {
-            merger = merger->next;//merge with the next block
-        }
+  sem_wait(semid);
+  if (ptr == NULL){
+    sem_signal(semid);
+    return;
+  }
+  ptr = (char*) ptr;
+  ptr = ptr - sizeof(struct chunk);
+  int flag = 0;
+  struct chunk* temp_ptr = chunk_head;
+  while(temp_ptr) {
+    if (((char*)temp_ptr) == ptr) {
+      flag = 1;
+      break;
     }
+    temp_ptr = temp_ptr->next;//getting across the linked list
+  }
+  if(flag == 0) {
+    sem_signal(semid);
+    return;
+  }
+  struct chunk *p = (struct chunk*)ptr;
+  p->state = FREE;
+  struct chunk *merger = NULL;
+  merger = chunk_head;
+  while(merger!= NULL && merger->next!= NULL) {//possible to merge with the next block
+      if (merger->next->state == FREE && merger->state == FREE) {
+          merger->size += merger->next->size + sizeof(struct chunk);
+          merger->next = merger->next->next;
+      } else {
+          merger = merger->next;//merge with the next block
+      }
+  }
+
+  sem_signal(semid);
+  return;
 }
 
 void *calloc(size_t num, size_t size)//allocate memory for an array and initialize it to zero
 {
-    char* p = (char*) malloc(num*size);
-    if(p == NULL)
-        return p;
-    int k = 0;
-    while (k < num*size)
-    {
-        p[k] = 0;
-        ++k;
-    }
+  char* p = (char*) malloc(num*size);
+  if(p == NULL) {
     return p;
+  }
+
+  int k = 0;
+  while (k < num*size)
+  {
+      p[k] = 0;
+      ++k;
+  }
+  return p;
 }
 
 void *realloc(void *oldptr, size_t size)
 {
-    //speacial case
-    if (oldptr == NULL)
-        return malloc(size);
-    if (size == 0)
-        free(oldptr);
+  //speacial case
+  if (oldptr == NULL){
+    return malloc(size);
+  }
+      
+  if (size == 0) {
+    free(oldptr);
+    return NULL;
+  }
+
+  //common case
+  oldptr = (char*) oldptr;
+  struct chunk* old_chunk = (struct chunk*)(oldptr - sizeof(struct chunk));
+  if(old_chunk->size >= size) {//old chunk is bigger, clone the prevoius part
+    char* newptr = (char*) malloc(size);
+    if(newptr == NULL)
         return NULL;
-    //common case
-    oldptr = (char*) oldptr;
-    struct chunk* old_chunk = (struct chunk*)(oldptr - sizeof(struct chunk));
-    if(old_chunk->size >= size) {//old chunk is bigger, clone the prevoius part
-        char* newptr = (char*) malloc(size);
+    else {
+        memcpy(newptr, oldptr, size);//choose a smaller size to copy
+        free(oldptr);
+        return newptr;
+    }
+    } else {//old chunk is smaller, allocate new block and copy the data
+        void* newptr = malloc(size);
         if(newptr == NULL)
             return NULL;
-        else {
-            memcpy(newptr, oldptr, size);//choose a smaller size to copy
-            free(oldptr);
-            return newptr;
-        }
-        } else {//old chunk is smaller, allocate new block and copy the data
-            void* newptr = malloc(size);
-            if(newptr == NULL)
-                return NULL;
-            memcpy(newptr, oldptr, old_chunk->size);//choose a smaller part to copy
-            free(oldptr);
-            return newptr;
-        }
-    return NULL;
+        memcpy(newptr, oldptr, old_chunk->size);//choose a smaller part to copy
+        free(oldptr);
+        return newptr;
+    }
 }
 
 /*************D O  N O T  T O U C H  A N Y T H I N G  B E L O W*************/
@@ -140,6 +185,7 @@ static void tsk_malloc(void *pv)
 	  a[i]=malloc(i+1);
 	  a[i][i]=17;
   }
+
   for(i = 0; i < c; i++) {
 	  free(a[i]);
   }
